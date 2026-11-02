@@ -71,8 +71,8 @@ router.post('/', upload.single('image'), validateRequest(schemas.productCreate),
      } */
   
   let productData = Object.assign(req.body, { imageUrl: req.file ? `/uploads/products/${req.file.filename}` : null });
-  new Product(productData);
-  res.status(201).json(productData);
+  let product = new Product(productData);
+  res.status(201).json(product.info);
 });
 
 router.post('/:id/image', upload.single('image'), validateRequest(schemas.idParam, 'params'), (req, res, next) => {
