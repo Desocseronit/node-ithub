@@ -7,6 +7,15 @@ const Product = require('./../models/Product');
 router.get('/',
     validateRequest(schemas.productQuery, 'query'),
     (req, res) => {
+        /*  #swagger.parameters['page'] = { in: 'query', type: 'integer', default: 1 }
+            #swagger.parameters['limit'] = { in: 'query', type: 'integer', default: 10 }
+            #swagger.parameters['category'] = { in: 'query', type: 'string' }
+            #swagger.parameters['search'] = { in: 'query', type: 'string' }
+            #swagger.parameters['minPrice'] = { in: 'query', type: 'number' }
+            #swagger.parameters['maxPrice'] = { in: 'query', type: 'number' }
+            #swagger.parameters['sort'] = { in: 'query', type: 'string', default: 'id' }
+            #swagger.parameters['order'] = { in: 'query', type: 'string', enum: ['asc', 'desc'], default: 'asc' } */
+
         const { page, limit, category, search, minPrice, maxPrice, sort, order } = req.query;
 
         let items = Object.values(Product.allInstances);
@@ -38,6 +47,8 @@ router.get('/',
 router.get('/:id',
     validateRequest(schemas.idParam, 'params'),
     (req, res, next) => {
+        // #swagger.parameters['id'] = { in: 'path', type: 'string', required: true }
+
         const product = Product.allInstances[req.params.id];
         if (!product) {
             const err = new Error(`Product with id ${req.params.id} not found`);
@@ -53,6 +64,25 @@ router.post('/',
     upload.single('image'),
     validateRequest(schemas.productCreate),
     (req, res, next) => {
+        /*  #swagger.requestBody = {
+                required: true,
+                content: {
+                    "multipart/form-data": {
+                        schema: {
+                            type: "object",
+                            properties: {
+                                name: { type: "string" },
+                                price: { type: "number" },
+                                category: { type: "string" },
+                                description: { type: "string" },
+                                image: { type: "string", format: "binary" }
+                            },
+                            required: ["name", "price"]
+                        }
+                    }
+                }
+            } */
+
         let productData = Object.assign(req.body, { imageUrl: req.file ? `/uploads/products/${req.file.filename}` : null });
         new Product(productData);
         res.status(201).json(productData);
@@ -63,6 +93,22 @@ router.post('/:id/image',
     upload.single('image'),
     validateRequest(schemas.idParam, 'params'),
     (req, res, next) => {
+        /*  #swagger.parameters['id'] = { in: 'path', type: 'string', required: true }
+            #swagger.requestBody = {
+                required: true,
+                content: {
+                    "multipart/form-data": {
+                        schema: {
+                            type: "object",
+                            properties: {
+                                image: { type: "string", format: "binary" }
+                            },
+                            required: ["image"]
+                        }
+                    }
+                }
+            } */
+
         const product = Product.allInstances[req.params.id];
         if (!product) {
             const err = new Error(`Product with id ${req.params.id} not found`);
@@ -86,6 +132,26 @@ router.put('/:id',
     validateRequest(schemas.idParam, 'params'),
     validateRequest(schemas.productCreate),
     (req, res, next) => {
+        /*  #swagger.parameters['id'] = { in: 'path', type: 'string', required: true }
+            #swagger.requestBody = {
+                required: true,
+                content: {
+                    "multipart/form-data": {
+                        schema: {
+                            type: "object",
+                            properties: {
+                                name: { type: "string" },
+                                price: { type: "number" },
+                                category: { type: "string" },
+                                description: { type: "string" },
+                                image: { type: "string", format: "binary" }
+                            },
+                            required: ["name", "price"]
+                        }
+                    }
+                }
+            } */
+
         let product = Product.allInstances[req.params.id];
         if (!product) {
             const err = new Error(`Product with id ${req.params.id} not found`);
@@ -104,6 +170,24 @@ router.patch('/:id',
     validateRequest(schemas.idParam, 'params'),
     validateRequest(schemas.patchProduct),
     (req, res, next) => {
+        /*  #swagger.parameters['id'] = { in: 'path', type: 'string', required: true }
+            #swagger.requestBody = {
+                content: {
+                    "multipart/form-data": {
+                        schema: {
+                            type: "object",
+                            properties: {
+                                name: { type: "string" },
+                                price: { type: "number" },
+                                category: { type: "string" },
+                                description: { type: "string" },
+                                image: { type: "string", format: "binary" }
+                            }
+                        }
+                    }
+                }
+            } */
+
         let product = Product.allInstances[req.params.id];
         if (!product) {
             const err = new Error(`Product with id ${req.params.id} not found`);
@@ -123,6 +207,8 @@ router.patch('/:id',
 router.delete('/:id',
     validateRequest(schemas.idParam, 'params'),
     (req, res, next) => {
+        // #swagger.parameters['id'] = { in: 'path', type: 'string', required: true }
+
         const product = Product.allInstances[req.params.id];
         if (!product) {
             const err = new Error(`Product with id ${req.params.id} not found`);
@@ -134,6 +220,5 @@ router.delete('/:id',
         res.json({ok:true});
     }
 );
-
 
 module.exports = router;
