@@ -4,7 +4,6 @@ const config = require('./config');
 const productRoutes = require('./routes/products');
 const logger = require('./middleware/logger');
 const { notFound, errorHandler } = require('./middleware/errorHandler');;
-const upload = require('./middleware/upload')
 
 const app = express();
 

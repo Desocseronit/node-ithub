@@ -1,12 +1,13 @@
 const multer = require('multer');
 const path = require('path');
+const crypto = require('crypto');
 
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
         cb(null, 'uploads/products');
     },
     filename: function (req, file, cb) {
-        cb(null, Date.now() + path.extname(file.originalname));
+        cb(null, `${Date.now()}-${crypto.randomUUID()}${path.extname(file.originalname).toLowerCase()}`);
     }
 });
 
@@ -23,6 +24,7 @@ const fileFilter = (req, file, cb) => {
         let err = new Error('Invalid file format. Only JPEG and PNG are allowed.');
         err.statusCode = 400;
         err.isOperational = true;
+        err.isMulter = true;
         return cb(err);
     }
 };
@@ -33,4 +35,4 @@ const upload = multer({
     limits: { fileSize: 2 * 1024 * 1024 }
 });
 
-module.exports = { multer }
+module.exports = upload

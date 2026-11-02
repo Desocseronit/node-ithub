@@ -12,18 +12,17 @@ const errorHandler = (err, req, res, next) => {
     }
 
     
-    // if (err.isJoi) {
-    //     return res.status(400).json({
-    //         error: 'Validation failed',
-    //         details: err.details.map(d => ({
-    //             message: d.message,
-    //             path: d.path,
-    //         })),
-    //     });
-    // }
-
+    if (err.isJoi) {
+        return res.status(400).json({
+            error: 'Validation failed',
+            details: err.details.map(d => ({
+                message: d.message,
+                path: d.path,
+            })),
+        });
+    }
     
-    if (err.name === 'MulterError') {
+    if (err.isMulter) {
         return res.status(400).json({
             error: `Upload error: ${err.message}`,
             code: err.code,
