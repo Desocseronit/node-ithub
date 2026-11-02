@@ -68,6 +68,16 @@ const schemas = {
     idParam: Joi.object({
         id: Joi.number().integer().min(0).required(),
     }),
+
+
+    //PATCH /:id
+    patchProduct: Joi.object({
+        name: Joi.string().trim().min(2).max(100),
+        price: Joi.number().min(1),
+        category: Joi.string().trim().valid('electronics', 'clothing', 'food', 'other'),
+        stock: Joi.number().integer().min(0),
+        description: Joi.string().allow(null, '').max(500)
+    })
 };
 
 module.exports = { validateRequest, schemas };

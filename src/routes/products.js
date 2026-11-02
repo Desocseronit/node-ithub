@@ -53,7 +53,7 @@ router.post('/',
     upload.single('image'),
     validateRequest(schemas.productCreate),
     (req, res, next) => {
-        let productData = Object.assign(req.body, { imageUrl: req.file ? `/uploads/products/${req.file.filename}` : null })
+        let productData = Object.assign(req.body, { imageUrl: req.file ? `/uploads/products/${req.file.filename}` : null });
         new Product(productData);
         res.status(201).json(productData);
     }
@@ -80,6 +80,60 @@ router.post('/:id/image',
         res.json(product.info);
     }
 )
+
+router.put('/:id',
+    upload.single('image'),
+    validateRequest(schemas.idParam, 'params'),
+    validateRequest(schemas.productCreate),
+    (req, res, next) => {
+        let product = Product.allInstances[req.params.id];
+        if (!product) {
+            const err = new Error(`Product with id ${req.params.id} not found`);
+            err.statusCode = 404;
+            err.isOperational = true;
+            return next(err);
+        }
+        let newProductData = Object.assign(req.body, { imageUrl: req.file ? `/uploads/products/${req.file.filename}` : null });
+        Object.assign(product, newProductData)
+        res.json(product.info);
+    }
+)
+
+router.patch('/:id',
+    upload.single('image'),
+    validateRequest(schemas.idParam, 'params'),
+    validateRequest(schemas.patchProduct),
+    (req, res, next) => {
+        let product = Product.allInstances[req.params.id];
+        if (!product) {
+            const err = new Error(`Product with id ${req.params.id} not found`);
+            err.statusCode = 404;
+            err.isOperational = true;
+            return next(err);
+        }
+        let newProductData = req.body;
+        if(req.file){
+            newProductData = Object.assign(req.body, { imageUrl: req.file ? `/uploads/products/${req.file.filename}` : null });
+        }
+        Object.assign(product, newProductData)
+        res.json(product.info);
+    }
+)
+
+router.delete('/:id',
+    validateRequest(schemas.idParam, 'params'),
+    (req, res, next) => {
+        const product = Product.allInstances[req.params.id];
+        if (!product) {
+            const err = new Error(`Product with id ${req.params.id} not found`);
+            err.statusCode = 404;
+            err.isOperational = true;
+            return next(err);
+        }
+        delete Product.allInstances[req.params.id];
+        res.json({ok:true});
+    }
+);
 
 
 module.exports = router;
