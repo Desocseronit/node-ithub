@@ -4,11 +4,13 @@
     "express": "^5.3.0",
     "joi": "^18.3.1",
     "multer": "^2.5.0",
+    "prisma": "^7.10.1",
     "swagger-autogen": "^2.23.7",
     "swagger-ui-express": "^5.0.1"
   },
   "scripts": {
     "swagger": "node swagger.js",
-    "start": "npm run swagger && node ./src/index.js"
+    "start": "npm run swagger && node ./src/index.js",
+    "postinstall": "prisma skills sync || exit 0"
   }
 }

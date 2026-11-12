@@ -1,6 +1,11 @@
 .env
 node_modules
 .vscode
+/src/generated/prisma
+*.db
+*.db-journal
+prisma/*.db
+prisma/*.db-journal
 # These files are for tests
 pic.png
 request.http
