@@ -1,5 +1,5 @@
 const Joi = require('joi');
-const fs = require('fs')
+const fs = require('fs');
 
 const validateRequest = (schemas, source = 'body') => {
     let map = schemas && (schemas.body || schemas.query || schemas.params)
@@ -64,19 +64,71 @@ const schemas = {
         return v;
     }),
 
-    // GET /products/:id
+    // GET /products/:id || /users/:id  || /posts/:id
     idParam: Joi.object({
         id: Joi.number().integer().min(0).required(),
     }),
 
 
-    //PATCH /:id
+    //PATCH /products/:id
     patchProduct: Joi.object({
         name: Joi.string().trim().min(2).max(100),
         price: Joi.number().min(1),
         category: Joi.string().trim().valid('electronics', 'clothing', 'food', 'other'),
         stock: Joi.number().integer().min(0),
         description: Joi.string().allow(null, '').max(500)
+    }),
+
+    //GET /users
+    userQuery: Joi.object({
+        page: Joi.number().integer().min(1).default(1),
+        limit: Joi.number().integer().min(1).max(100).default(10),
+        sort: Joi.string().valid('name', 'createdAt').default('createdAt'),
+        order: Joi.string().valid('asc', 'desc').default('desc'),
+    }),
+
+    //POST /users
+    userCreate: Joi.object({
+        email: Joi.email().required(),
+        name: Joi.string().trim().min(2).max(100).required(),
+        role: Joi.string().trim().valid("USER", "ADMIN").required(),
+    }),
+
+    //PATCH /users/:id
+    userPatch: Joi.object({
+        email: Joi.email().required(),
+        name: Joi.string().trim().min(2).max(100).required(),
+        role: Joi.string().trim().valid("USER", "ADMIN").required(),
+    }),
+
+    //GET /posts
+    postQuare: Joi.object({
+        page: Joi.number().integer().min(1).default(1),
+        limit: Joi.number().integer().min(1).max(100).default(10),
+        sort: Joi.string().valid('name', 'createdAt').default('createdAt'),
+        order: Joi.string().valid('asc', 'desc').default('desc'),
+    }),
+
+    //POST /posts
+    postCreate: Joi.object({
+        title: Joi.string().trim().min(2).max(50).required(),
+        content: Joi.string().trim().min(2).max(500).allow(null, ''),
+        published: Joi.boolean().default(false),
+        authorId: Joi.number().integer().positive().required(),
+        tags: Joi.array()
+            .items(Joi.number().integer().positive())
+            .unique()
+    }),
+
+    //PATCH /posts/:id
+    postPatch: Joi.object({
+        title: Joi.string().trim().min(2).max(50),
+        content: Joi.string().trim().min(2).max(500).allow(null, ''),
+        published: Joi.boolean().default(false),
+        authorId: Joi.number().integer().positive(),
+        tags: Joi.array()
+            .items(Joi.number().integer().positive())
+            .unique(),
     })
 };
 
