@@ -31,7 +31,11 @@ const validateRequest = (schemas, source = 'body') => {
                 return next(err);
             }
 
-            req[src] = value;
+            if (src === 'query') {
+                Object.assign(req.query, value);
+            } else {
+                req[src] = value;
+            }
         }
         next();
     };
@@ -87,49 +91,53 @@ const schemas = {
         order: Joi.string().valid('asc', 'desc').default('desc'),
     }),
 
-    //POST /users
+    // POST /users
     userCreate: Joi.object({
-        email: Joi.email().required(),
+        email: Joi.string().email().trim().lowercase().required(),
         name: Joi.string().trim().min(2).max(100).required(),
-        role: Joi.string().trim().valid("USER", "ADMIN").required(),
+        role: Joi.string().trim().valid('USER', 'ADMIN').default('USER'),
     }),
 
-    //PATCH /users/:id
+    // PATCH /users/:id
     userPatch: Joi.object({
-        email: Joi.email().required(),
-        name: Joi.string().trim().min(2).max(100).required(),
-        role: Joi.string().trim().valid("USER", "ADMIN").required(),
-    }),
+        email: Joi.string().email().trim().lowercase(),
+        name: Joi.string().trim().min(2).max(100),
+        role: Joi.string().trim().valid('USER', 'ADMIN'),
+    }).min(1),
 
-    //GET /posts
-    postQuare: Joi.object({
+    // GET /posts
+    postQuery: Joi.object({
         page: Joi.number().integer().min(1).default(1),
         limit: Joi.number().integer().min(1).max(100).default(10),
-        sort: Joi.string().valid('name', 'createdAt').default('createdAt'),
+        search: Joi.string().trim().max(200),
+        published: Joi.boolean(),
+        authorId: Joi.number().integer().positive(),
+        sort: Joi.string().valid('title', 'createdAt').default('createdAt'),
         order: Joi.string().valid('asc', 'desc').default('desc'),
     }),
 
-    //POST /posts
+    // POST /posts
     postCreate: Joi.object({
         title: Joi.string().trim().min(2).max(50).required(),
         content: Joi.string().trim().min(2).max(500).allow(null, ''),
         published: Joi.boolean().default(false),
         authorId: Joi.number().integer().positive().required(),
         tags: Joi.array()
-            .items(Joi.number().integer().positive())
+            .items(Joi.string().trim().min(1).max(50))
             .unique()
+            .default([]),
     }),
 
-    //PATCH /posts/:id
+    // PATCH /posts/:id
     postPatch: Joi.object({
         title: Joi.string().trim().min(2).max(50),
         content: Joi.string().trim().min(2).max(500).allow(null, ''),
-        published: Joi.boolean().default(false),
+        published: Joi.boolean(),
         authorId: Joi.number().integer().positive(),
         tags: Joi.array()
-            .items(Joi.number().integer().positive())
+            .items(Joi.string().trim().min(1).max(50))
             .unique(),
-    })
+    }).min(1),
 };
 
 module.exports = { validateRequest, schemas };

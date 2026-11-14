@@ -1,10 +1,11 @@
-KT2 node ithub
+# KT2 & КТ3 node ithub
 
+## How to run
 
-How to run
 1. npm install
-2. npm run swagger
-3. npm start
+2. npx prisma generate
+3. npx prisma migrate dev --name init
+4. npm run swagger
+5. npm start
 
-
-U can see doc on /api-docs
+You can see docs on `/api-docs`

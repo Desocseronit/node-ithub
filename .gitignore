@@ -6,6 +6,7 @@ node_modules
 *.db-journal
 prisma/*.db
 prisma/*.db-journal
+swagger-output.json
 # These files are for tests
 pic.png
 request.http
