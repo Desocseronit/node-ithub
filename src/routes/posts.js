@@ -1,6 +1,7 @@
 const express = require('express');
 const prisma = require('../config/prisma');
 const { validateRequest, schemas } = require('../middleware/validate');
+const { authenticate } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -11,19 +12,15 @@ const createError = (statusCode, message) => {
     return err;
 };
 
-// GET /api/posts — Список с фильтрацией и пагинацией
-router.get('/', validateRequest(schemas.postQuery, 'query'), async (req, res, next) => {
-    /* #swagger.tags = ['Posts']
-       #swagger.summary = 'Список постов с фильтрацией и пагинацией'
-       #swagger.parameters['page'] = { in: 'query', type: 'integer', default: 1, description: 'Номер страницы' }
-       #swagger.parameters['limit'] = { in: 'query', type: 'integer', default: 10, description: 'Количество на странице' }
-       #swagger.parameters['search'] = { in: 'query', type: 'string', description: 'Поиск по заголовку' }
-       #swagger.parameters['published'] = { in: 'query', type: 'boolean', description: 'Фильтр по статусу публикации' }
-       #swagger.parameters['authorId'] = { in: 'query', type: 'integer', description: 'Фильтр по ID автора' }
-       #swagger.parameters['sort'] = { in: 'query', type: 'string', enum: ['title', 'createdAt'], default: 'createdAt', description: 'Поле сортировки' }
-       #swagger.parameters['order'] = { in: 'query', type: 'string', enum: ['asc', 'desc'], default: 'desc', description: 'Направление сортировки' }
-    */
+const authorSafeSelect = {
+    id: true,
+    email: true,
+    name: true,
+    role: true,
+};
 
+// GET /api/posts — Список с фильтрацией и пагинацией (доступно всем)
+router.get('/', validateRequest(schemas.postQuery, 'query'), async (req, res, next) => {
     try {
         const page = Number(req.query.page) || 1;
         const limit = Number(req.query.limit) || 10;
@@ -55,7 +52,7 @@ router.get('/', validateRequest(schemas.postQuery, 'query'), async (req, res, ne
                 take: limit,
                 orderBy: { [sort]: order },
                 include: {
-                    author: true,
+                    author: { select: authorSafeSelect },
                     tags: true,
                 },
             }),
@@ -76,20 +73,15 @@ router.get('/', validateRequest(schemas.postQuery, 'query'), async (req, res, ne
     }
 });
 
-// GET /api/posts/:id — Пост с автором и тегами
+// GET /api/posts/:id — Пост с автором и тегами (доступно всем)
 router.get('/:id', validateRequest(schemas.idParam, 'params'), async (req, res, next) => {
-    /* #swagger.tags = ['Posts']
-       #swagger.summary = 'Получить пост по ID'
-       #swagger.parameters['id'] = { in: 'path', type: 'integer', required: true, description: 'ID поста' }
-    */
-
     try {
         const id = Number(req.params.id);
 
         const post = await prisma.post.findUnique({
             where: { id },
             include: {
-                author: true,
+                author: { select: authorSafeSelect },
                 tags: true,
             },
         });
@@ -104,103 +96,73 @@ router.get('/:id', validateRequest(schemas.idParam, 'params'), async (req, res, 
     }
 });
 
-// POST /api/posts — Создать пост
-router.post('/', validateRequest(schemas.postCreate, 'body'), async (req, res, next) => {
-    /* #swagger.tags = ['Posts']
-       #swagger.summary = 'Создать пост'
-       #swagger.requestBody = {
-         required: true,
-         content: {
-           "application/json": {
-             schema: {
-               type: "object",
-               properties: {
-                 title: { type: "string", minLength: 2, maxLength: 50, example: "Мой первый пост" },
-                 content: { type: "string", minLength: 2, maxLength: 500, example: "Текст поста..." },
-                 published: { type: "boolean", default: false },
-                 authorId: { type: "integer", minimum: 1, example: 1 },
-                 tags: {
-                   type: "array",
-                   items: { type: "string" },
-                   example: ["nodejs", "prisma"]
-                 }
-               },
-               required: ["title", "authorId"]
-             }
-           }
-         }
-       }
-    */
-
-    try {
-        const { title, content, published, authorId, tags } = req.body;
-
-        const authorExists = await prisma.user.findUnique({ where: { id: authorId } });
-        if (!authorExists) {
-            return next(createError(404, `Author with id ${authorId} not found`));
+// POST /api/posts — Создать пост (USER, MODERATOR, ADMIN)
+router.post(
+    '/',
+    authenticate,
+    (req, res, next) => {
+        // Подставляем authorId из JWT, чтобы прошла схема валидации postCreate
+        if (req.body && !req.body.authorId) {
+            req.body.authorId = req.user.id;
         }
+        next();
+    },
+    validateRequest(schemas.postCreate, 'body'),
+    async (req, res, next) => {
+        try {
+            const { title, content, published, tags } = req.body;
+            const authorId = req.user.id;
 
-        const post = await prisma.post.create({
-            data: {
-                title,
-                content,
-                published,
-                authorId,
-                ...(tags && tags.length > 0 && {
-                    tags: {
-                        connectOrCreate: tags.map((tagName) => ({
-                            where: { name: tagName },
-                            create: { name: tagName },
-                        })),
-                    },
-                }),
-            },
-            include: {
-                author: true,
-                tags: true,
-            },
-        });
+            const post = await prisma.post.create({
+                data: {
+                    title,
+                    content,
+                    published,
+                    authorId,
+                    ...(tags && tags.length > 0 && {
+                        tags: {
+                            connectOrCreate: tags.map((tagName) => ({
+                                where: { name: tagName },
+                                create: { name: tagName },
+                            })),
+                        },
+                    }),
+                },
+                include: {
+                    author: { select: authorSafeSelect },
+                    tags: true,
+                },
+            });
 
-        res.status(201).json(post);
-    } catch (err) {
-        next(err);
+            res.status(201).json(post);
+        } catch (err) {
+            next(err);
+        }
     }
-});
+);
 
-// PATCH /api/posts/:id — Обновить пост
+// PATCH /api/posts/:id — Обновить пост (USER: только свой; MODERATOR/ADMIN: любой)
 router.patch(
     '/:id',
+    authenticate,
     validateRequest({ params: schemas.idParam, body: schemas.postPatch }),
     async (req, res, next) => {
-        /* #swagger.tags = ['Posts']
-           #swagger.summary = 'Обновить пост'
-           #swagger.parameters['id'] = { in: 'path', type: 'integer', required: true, description: 'ID поста' }
-           #swagger.requestBody = {
-             required: true,
-             content: {
-               "application/json": {
-                 schema: {
-                   type: "object",
-                   properties: {
-                     title: { type: "string", minLength: 2, maxLength: 50, example: "Обновленный заголовок" },
-                     content: { type: "string", minLength: 2, maxLength: 500, example: "Новый текст..." },
-                     published: { type: "boolean" },
-                     authorId: { type: "integer", minimum: 1 },
-                     tags: {
-                       type: "array",
-                       items: { type: "string" },
-                       example: ["backend", "express"]
-                     }
-                   }
-                 }
-               }
-             }
-           }
-        */
-
         try {
             const id = Number(req.params.id);
             const { title, content, published, authorId, tags } = req.body;
+
+            // Проверяем существование поста и права доступа (ownership / RBAC)
+            const existingPost = await prisma.post.findUnique({ where: { id } });
+            if (!existingPost) {
+                return next(createError(404, `Post with id ${id} not found`));
+            }
+
+            const isOwner = existingPost.authorId === req.user.id;
+            const isPrivileged = ['MODERATOR', 'ADMIN'].includes(req.user.role);
+
+            if (!isOwner && !isPrivileged) {
+                return next(createError(403, 'Forbidden: you can only edit your own posts'));
+            }
 
             if (authorId !== undefined) {
                 const authorExists = await prisma.user.findUnique({ where: { id: authorId } });
@@ -227,7 +189,7 @@ router.patch(
                     }),
                 },
                 include: {
-                    author: true,
+                    author: { select: authorSafeSelect },
                     tags: true,
                 },
             });
@@ -242,27 +204,40 @@ router.patch(
     }
 );
 
-// DELETE /api/posts/:id — Удалить пост
-router.delete('/:id', validateRequest(schemas.idParam, 'params'), async (req, res, next) => {
-    /* #swagger.tags = ['Posts']
-       #swagger.summary = 'Удалить пост'
-       #swagger.parameters['id'] = { in: 'path', type: 'integer', required: true, description: 'ID поста' }
-    */
+// DELETE /api/posts/:id — Удалить пост (USER: только свой; MODERATOR/ADMIN: любой)
+router.delete(
+    '/:id',
+    authenticate,
+    validateRequest(schemas.idParam, 'params'),
+    async (req, res, next) => {
+        try {
+            const id = Number(req.params.id);
 
-    try {
-        const id = Number(req.params.id);
+            // Проверяем существование поста и права доступа (ownership / RBAC)
+            const existingPost = await prisma.post.findUnique({ where: { id } });
+            if (!existingPost) {
+                return next(createError(404, `Post with id ${id} not found`));
+            }
 
-        await prisma.post.delete({
-            where: { id },
-        });
+            const isOwner = existingPost.authorId === req.user.id;
+            const isPrivileged = ['MODERATOR', 'ADMIN'].includes(req.user.role);
 
-        res.status(204).send();
-    } catch (err) {
-        if (err.code === 'P2025') {
-            return next(createError(404, `Post with id ${req.params.id} not found`));
+            if (!isOwner && !isPrivileged) {
+                return next(createError(403, 'Forbidden: you can only delete your own posts'));
+            }
+
+            await prisma.post.delete({
+                where: { id },
+            });
+
+            res.status(204).send();
+        } catch (err) {
+            if (err.code === 'P2025') {
+                return next(createError(404, `Post with id ${req.params.id} not found`));
+            }
+            next(err);
         }
-        next(err);
     }
-});
+);
 
 module.exports = router;
