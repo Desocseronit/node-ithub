@@ -97,3 +97,8 @@ REST API для управления постами, пользователям�
 | `PATCH` | `/api/users/:id` | `ADMIN` | Редактирование пользователя |
 | `DELETE` | `/api/users/:id` | `ADMIN` | Удаление пользователя |
 | `PATCH` | `/admin/users/:id/role` | `ADMIN` | Изменение роли пользователя (`USER`, `MODERATOR`, `ADMIN`) |
+
+
+## Публичный деплой
+- **API URL:** https://node-ithub.onrender.com
+- **Swagger UI:** https://node-ithub.onrender.com/api/docs

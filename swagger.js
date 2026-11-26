@@ -8,8 +8,12 @@ const doc = {
   },
   servers: [
     {
-      url: 'http://localhost:3000',
-      description: 'Local server',
+      url: '/',
+      description: 'Current server',
+    },
+    {
+      url: 'https://node-ithub.onrender.com/',
+      description: 'Production (Render)',
     },
   ],
   components: {
