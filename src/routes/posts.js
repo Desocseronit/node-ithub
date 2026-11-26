@@ -1,5 +1,6 @@
 const express = require('express');
 const prisma = require('../config/prisma');
+const redis = require('../config/redis');
 const { validateRequest, schemas } = require('../middleware/validate');
 const { authenticate } = require('../middleware/auth');
 
@@ -19,9 +20,35 @@ const authorSafeSelect = {
     role: true,
 };
 
-// GET /api/posts — Список с фильтрацией и пагинацией (доступно всем)
+// Вспомогательная функция очистки кэша постов
+const clearPostsCache = async () => {
+    if (!redis) return;
+    try {
+        const keys = await redis.keys('posts:*');
+        if (keys.length > 0) {
+            await redis.del(keys);
+        }
+    } catch (err) {
+        console.error('Failed to clear Redis cache:', err.message);
+    }
+};
+
+// GET /api/posts — Список с фильтрацией, пагинацией и кэшированием в Redis
 router.get('/', validateRequest(schemas.postQuery, 'query'), async (req, res, next) => {
     try {
+        const cacheKey = `posts:${JSON.stringify(req.query)}`;
+
+        if (redis) {
+            try {
+                const cachedData = await redis.get(cacheKey);
+                if (cachedData) {
+                    return res.json(JSON.parse(cachedData));
+                }
+            } catch (err) {
+                console.error('Redis get error:', err.message);
+            }
+        }
+
         const page = Number(req.query.page) || 1;
         const limit = Number(req.query.limit) || 10;
         const sort = req.query.sort || 'createdAt';
@@ -34,6 +61,7 @@ router.get('/', validateRequest(schemas.postQuery, 'query'), async (req, res, ne
         if (search) {
             where.title = {
                 contains: search,
+                mode: 'insensitive', // регистронезависимый поиск для PostgreSQL
             };
         }
 
@@ -59,7 +87,7 @@ router.get('/', validateRequest(schemas.postQuery, 'query'), async (req, res, ne
             prisma.post.count({ where }),
         ]);
 
-        res.json({
+        const responsePayload = {
             data: posts,
             meta: {
                 total,
@@ -67,13 +95,23 @@ router.get('/', validateRequest(schemas.postQuery, 'query'), async (req, res, ne
                 limit,
                 pages: Math.ceil(total / limit),
             },
-        });
+        };
+
+        if (redis) {
+            try {
+                await redis.set(cacheKey, JSON.stringify(responsePayload), 'EX', 60);
+            } catch (err) {
+                console.error('Redis set error:', err.message);
+            }
+        }
+
+        res.json(responsePayload);
     } catch (err) {
         next(err);
     }
 });
 
-// GET /api/posts/:id — Пост с автором и тегами (доступно всем)
+// GET /api/posts/:id — Пост с автором и тегами
 router.get('/:id', validateRequest(schemas.idParam, 'params'), async (req, res, next) => {
     try {
         const id = Number(req.params.id);
@@ -101,7 +139,6 @@ router.post(
     '/',
     authenticate,
     (req, res, next) => {
-        // Подставляем authorId из JWT, чтобы прошла схема валидации postCreate
         if (req.body && !req.body.authorId) {
             req.body.authorId = req.user.id;
         }
@@ -134,6 +171,7 @@ router.post(
                 },
             });
 
+            await clearPostsCache();
             res.status(201).json(post);
         } catch (err) {
             next(err);
@@ -151,7 +189,6 @@ router.patch(
             const id = Number(req.params.id);
             const { title, content, published, authorId, tags } = req.body;
 
-            // Проверяем существование поста и права доступа (ownership / RBAC)
             const existingPost = await prisma.post.findUnique({ where: { id } });
             if (!existingPost) {
                 return next(createError(404, `Post with id ${id} not found`));
@@ -194,6 +231,7 @@ router.patch(
                 },
             });
 
+            await clearPostsCache();
             res.json(post);
         } catch (err) {
             if (err.code === 'P2025') {
@@ -213,7 +251,6 @@ router.delete(
         try {
             const id = Number(req.params.id);
 
-            // Проверяем существование поста и права доступа (ownership / RBAC)
             const existingPost = await prisma.post.findUnique({ where: { id } });
             if (!existingPost) {
                 return next(createError(404, `Post with id ${id} not found`));
@@ -230,6 +267,7 @@ router.delete(
                 where: { id },
             });
 
+            await clearPostsCache();
             res.status(204).send();
         } catch (err) {
             if (err.code === 'P2025') {

@@ -27,9 +27,15 @@ if (process.env.NODE_ENV !== 'test') {
 // Swagger (безопасное подключение, чтобы тесты не падали, если json ещё не сгенерирован)
 try {
   const swaggerDocument = require('../swagger-output.json');
-  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+  app.use(
+    '/api/docs',
+    swaggerUi.serve,
+    swaggerUi.setup(swaggerDocument, {
+      explorer: true,
+    })
+  );
 } catch (e) {
-
+  // ignore if swagger-output.json is not generated yet
 }
 
 app.use('/auth', authRoutes);
